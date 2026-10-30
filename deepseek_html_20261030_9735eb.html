@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0c0d11" />
+  <title>AI 英语/日语精读与语法树解析器 v6.5</title>
+  <style>
+    :root {
+      --bg-main: #0c0d11;
+      --bg-panel: #16171d;
+      --bg-card: #1c1e26;
+      --border-color: #2a2d38;
+      --border-highlight: #3b82f6;
+      --text-primary: #e8eaef;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-blue: #3b82f6;
+      --accent-blue-soft: rgba(59, 130, 246, 0.14);
+      --accent-green: #10b981;
+      
+      /* 节点颜色 */
+      --node-verb: #5c6bc0;
+      --node-conj: #ec407a;
+      --node-prep: #f59e0b;
+      --node-noun: #374151;
+      
+      --role-tag: #f59e0b;
+      --role-tag-bg: rgba(245, 158, 11, 0.16);
+      --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.35);
+      
+      /* 语法树连线颜色 */
+      --tree-line: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.75;
+      overflow-x: hidden;
+      touch-action: manipulation;
+      padding-bottom: calc(88px + env(safe-area-inset-bottom));
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 顶部导航栏 */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(12, 13, 17, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 15.5px;
+      color: #fff;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff;
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.25);
+    }
+
+    /* 顶部操作提示条 */
+    .guide-banner {
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.08));
+      border-bottom: 1px solid rgba(59, 130, 246, 0.18);
+      padding: 9px 16px;
+      font-size: 12px;
+      color: #93c5fd;
+      line-height: 1.45;
+    }
+
+    /* 文章阅读容器 */
+    .reader-container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 22px 16px 30px;
+    }
+
+    .article-title {
+      font-size: 21px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #ffffff;
+      line-height: 1.35;
+    }
+
+    .paragraph {
+      margin-bottom: 24px;
+      font-size: 18px;
+      line-height: 2.2;
+      color: #d1d5db;
+      text-align: justify;
+    }
+
+    .sentence-wrap {
+      display: inline;
+      border-radius: 6px;
+      padding: 2px 0;
+      transition: background-color 0.2s ease;
+    }
+
+    .sentence-wrap.active-sentence {
+      background-color: rgba(59, 130, 246, 0.2);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+    }
+
+    .word-token {
+      display: inline-block;
+      padding: 0 2px;
+      margin: 0 1px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    /* 日文注音样式 */
+    .word-token ruby { ruby-align: center; }
+    .word-token rt {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+      line-height: 1.1;
+    }
+
+    .word-token:hover { background-color: rgba(255, 255, 255, 0.07); }
+    .word-token.active-word {
+      background-color: var(--accent-blue);
+      color: #fff;
+    }
+    .word-token.active-word rt { color: rgba(255, 255, 255, 0.7); }
+
+    /* 单击单词翻译悬浮窗 */
+    .word-tooltip {
+      position: fixed;
+      z-index: 120;
+      width: 280px;
+      max-width: calc(100vw - 20px);
+      background: #1a1c25;
+      border: 1px solid #353849;
+      border-radius: 14px;
+      padding: 13px 14px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+      display: none;
+      animation: popIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .tooltip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+
+    .tooltip-word {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      word-break: break-word;
+    }
+
+    .speaker-btn {
+      background: var(--accent-blue-soft);
+      color: #60a5fa;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .tooltip-meaning {
+      font-size: 14px;
+      color: #e5e7eb;
+      line-height: 1.55;
+    }
+
+    .tooltip-footer {
+      margin-top: 9px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .tooltip-open-syntax {
+      color: #60a5fa;
+      background: none;
+      border: none;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* 双击句子语法分析底部抽屉 */
+    .syntax-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      z-index: 90;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .syntax-backdrop.show { opacity: 1; }
+
+    .syntax-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 88vh;
+      max-height: 94vh;
+      background: var(--bg-panel);
+      border-top: 1px solid #2e3140;
+      border-radius: 18px 18px 0 0;
+      z-index: 100;
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .syntax-sheet.open { transform: translateY(0); }
+
+    .sheet-drag-handle {
+      width: 40px;
+      height: 4.5px;
+      background: #4b5563;
+      border-radius: 3px;
+      margin: 11px auto 5px;
+      flex-shrink: 0;
+    }
+
+    .sheet-top-bar {
+      padding: 8px 16px 14px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .sheet-sentence-en, .sheet-sentence-ja {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f3f4f6;
+      line-height: 1.6;
+      margin-bottom: 5px;
+    }
+
+    .sheet-sentence-zh {
+      font-size: 13.5px;
+      color: #9ca3af;
+      line-height: 1.45;
+    }
+
+    .close-sheet-btn {
+      background: #242730;
+      color: #9ca3af;
+      border: 1px solid #353849;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      font-size: 17px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sheet-scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 14px calc(48px + env(safe-area-inset-bottom));
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 控制开关行与图例 */
+    .syntax-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: #121318;
+      border: 1px solid #252830;
+      border-radius: 10px;
+      font-size: 12.5px;
+      color: #9ca3af;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-label input { accent-color: var(--accent-blue); width: 15px; height: 15px; }
+
+    .btn-toggle-layout {
+      background: #1c1e26;
+      color: #93c5fd;
+      border: 1px solid #3b82f6;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .btn-toggle-layout:active { background: #2a2d38; }
+
+    /* 图例区 */
+    .legend-bar {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 12px;
+      padding: 0 4px;
+      flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-color { width: 10px; height: 10px; border-radius: 3px; }
+    .legend-color.verb { background: var(--node-verb); }
+    .legend-color.conj { background: var(--node-conj); }
+    .legend-color.prep { background: var(--node-prep); }
+    .legend-color.noun { background: var(--node-noun); }
+
+    /* 语法框图画布区 */
+    .diagram-viewport {
+      background: #111216;
+      border: 1px solid #252830;
+      border-radius: 12px;
+      padding: 16px 12px;
+      overflow-x: auto;
+      margin-bottom: 22px;
+      -webkit-overflow-scrolling: touch;
+      transition: overflow 0.2s;
+    }
+
+    .diagram-canvas {
+      min-width: max-content;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: transform 0.2s ease;
+      transform-origin: top left;
+    }
+
+    /* ======= 重绘树状结构 ======= */
+    .tree-row {
+      display: flex;
+      align-items: stretch;
+      position: relative;
+    }
+
+    /* 核心：绘制折叠线 */
+    .tree-indent {
+      display: flex;
+      flex-shrink: 0;
+    }
+    
+    .indent-guide {
+      width: 20px;
+      position: relative;
+      border-right: 1px dashed #3a3e4d;
+      margin-right: 8px;
+    }
+    
+    /* 当不是第一行时，画一个倒 L 形 */
+    .indent-guide::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #3a3e4d;
+    }
+    .tree-row:first-child .indent-guide { border-right-color: transparent; }
+    .tree-row:first-child .indent-guide::before { display: none; }
+
+    /* 玻璃拟态虚线大框 */
+    .clause-box {
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      padding: 18px 12px 12px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+    }
+
+    .clause-box-title {
+      position: absolute;
+      top: -10px;
+      left: 12px;
+      background: #181a22;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+      font-size: 10.5px;
+      padding: 0 8px;
+      border-radius: 6px;
+      line-height: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* ======= 水平/垂直 排版 ======= */
+    .nodes-flow {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: nowrap;
+    }
+    .nodes-flow.layout-vertical {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    /* ======= 节点 UI 升级 ======= */
+    .syntax-node {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+      position: relative;
+    }
+    .nodes-flow.layout-vertical .syntax-node {
+      flex-direction: row-reverse; /* 垂直模式下，标签在左，词块在右，更美观 */
+      align-items: center;
+      gap: 10px;
+    }
+
+    .syntax-node:active { transform: scale(0.95); }
+    .syntax-node.omitted-node { opacity: 0.85; }
+    .syntax-node.hidden-omitted { display: none; }
+
+    /* 聚焦高亮 */
+    .syntax-node.focus-node .word-box {
+      outline: 2px solid #60a5fa;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+    }
+
+    /* 角色标签：弱化背景，变成纯文字+彩色点 */
+    .role-badge {
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-secondary);
+    }
+    .role-badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #6b7280;
+    }
+
+    .role-badge.role-core { color: #34d399; }
+    .role-badge.role-core::before { background: #10b981; }
+    
+    .role-badge.role-Access { color: #f472b6; }
+    .role-badge.role-Access::before { background: #ec407a; }
+
+    /* 词块样式 */
+    .word-box {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #fff;
+      white-space: normal;
+      text-align: center;
+      max-width: 160px;
+      word-break: break-word;
+      border: 1px solid transparent;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+      line-height: 1.4;
+      position: relative;
+    }
+
+    /* 颜色渐变更显质感 */
+    .word-box.color-verb { background: linear-gradient(135deg, #5c6bc0, #4a589f); border-color: #7986cb; }
+    .word-box.color-conj { background: linear-gradient(135deg, #ec407a, #d81b60); border-color: #f06292; }
+    .word-box.color-prep { background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827; font-weight: 600; border-color: #fbbf24; }
+    .word-box.color-noun { background: linear-gradient(135deg, #374151, #1f2937); border-color: #4b5563; color: #e5e7eb; }
+
+    .syntax-node.omitted-node .word-box {
+      background: transparent;
+      border: 1.5px dashed #f59e0b;
+      color: #fcd34d;
+      box-shadow: none;
+    }
+
+    /* 箭头重绘（不再用长串字符） */
+    .arrow-icon {
+      font-size: 10px;
+      color: #6b7280;
+      font-family: sans-serif;
+      margin: 0 2px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .nodes-flow.layout-vertical .arrow-icon {
+      transform: rotate(90deg); /* 垂直模式下箭头向下转 */
+      margin-top: 2px;
+    }
+
+    /* 分栏标题栏 */
+    .section-tabs {
+      display: flex;
+      gap: 18px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 13px;
+      padding: 0 4px;
+    }
+
+    .section-tab {
+      padding: 8px 2px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #fff;
+      border-bottom: 2px solid var(--accent-blue);
+    }
+
+    /* 核心语法条目列表 */
+    .grammar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .grammar-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 13px 14px;
+    }
+
+    .grammar-pattern {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 700;
+      font-style: italic;
+      color: #f3f4f6;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+
+    .grammar-desc {
+      font-size: 12.5px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      line-height: 1.55;
+    }
+
+    .grammar-instance {
+      font-size: 12.5px;
+      color: #d1d5db;
+      padding-left: 10px;
+      border-left: 3px solid var(--accent-green);
+      background: rgba(16, 185, 129, 0.06);
+      padding-top: 5px;
+      padding-bottom: 5px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* 双栏重点词汇与辨析网格 */
+    .vocab-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 360px) { .vocab-grid { grid-template-columns: 1fr; } }
+
+    .vocab-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .vocab-card.highlight-card {
+      border-color: var(--border-highlight);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+    }
+
+    .vocab-word {
+      font-size: 13.5px;
+      font-weight: 700;
+      font-style: italic;
+      color: #93c5fd;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      word-break: break-word;
+    }
+
+    .vocab-pos {
+      font-size: 12px;
+      color: #e5e7eb;
+      padding-left: 7px;
+      border-left: 2px solid var(--accent-blue);
+      margin-bottom: 7px;
+      line-height: 1.45;
+    }
+
+    .vocab-note {
+      font-size: 11.5px;
+      color: #6ee7b7;
+      padding-top: 7px;
+      border-top: 1px dashed #2f3340;
+      line-height: 1.45;
+    }
+
+    /* ========== 弹窗通用 ========== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      z-index: 150;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 18px 18px 0 0;
+      width: 100%;
+      max-width: 560px;
+      padding: 18px 16px calc(28px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 92vh;
+      animation: sheetUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes sheetUp {
+      from { transform: translateY(40px); opacity: 0.6; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-desc {
+      font-size: 12.5px;
+      color: #9ca3af;
+      line-height: 1.5;
+    }
+
+    .modal-desc code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    .code-textarea {
+      width: 100%;
+      height: 280px;
+      background: #0e0f14;
+      border: 1px solid #2e3140;
+      border-radius: 11px;
+      color: #a7f3d0;
+      font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.5;
+      -webkit-user-select: text;
+      user-select: text;
+      spellcheck: false;
+      autocomplete: off;
+      autocorrect: off;
+      autocapitalize: off;
+    }
+
+    .code-textarea:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .modal-footer .btn {
+      flex: 1;
+      justify-content: center;
+      padding: 10px 12px;
+      font-size: 13.5px;
+    }
+
+    .copy-tip {
+      font-size: 12px;
+      color: #6ee7b7;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 8px;
+      padding: 8px 11px;
+      line-height: 1.45;
+    }
+
+    .status-toast {
+      position: fixed;
+      bottom: calc(28px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1e2130;
+      color: #e5e7eb;
+      border: 1px solid #353849;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.5;
+      max-width: min(90vw, 520px);
+    }
+
+    .status-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .status-toast.success { border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7; }
+    .status-toast.error { border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+
+    .import-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .import-actions .btn {
+      flex: 1;
+      justify-content: center;
+      font-size: 13px;
+      padding: 9px 10px;
+    }
+
+    .paste-status {
+      display: none;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 8px 11px;
+      border-radius: 8px;
+      border: 1px solid #353849;
+      background: #15161d;
+      color: #9ca3af;
+    }
+    .paste-status.show { display: block; }
+    .paste-status.ok { color: #6ee7b7; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); }
+    .paste-status.warn { color: #fbbf24; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3); }
+    .paste-status.info { color: #93c5fd; background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.3); }
+
+    .prompt-display {
+      width: 100%;
+      height: 220px;
+      background: #0e0f14;
+      border: 1px solid #2e3140;
+      border-radius: 11px;
+      color: #e5e7eb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      padding: 12px;
+      line-height: 1.55;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      user-select: text;
+      -webkit-user-select: text;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="brand">
+      <span>AI 语法精读台</span>
+      <span class="brand-badge">v6.5 双引擎</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn" id="copyPromptBtn">📋 提示词</button>
+      <button class="btn btn-primary" id="openImportBtn">📥 导入</button>
+    </div>
+  </header>
+
+  <div class="guide-banner">
+    <span>💡 <b>单击单词</b>：查词翻译 &nbsp;|&nbsp; <b>双击单词</b>：展开语法树</span>
+  </div>
+
+  <main class="reader-container">
+    <h1 class="article-title" id="articleTitle">Scientific Rigor & Language Learning</h1>
+    <div id="articleContent"></div>
+  </main>
+
+  <div class="word-tooltip" id="wordTooltip" role="tooltip">
+    <div class="tooltip-header">
+      <div>
+        <span class="tooltip-word" id="ttWord">word</span>
+      </div>
+      <button class="speaker-btn" id="ttSpeakBtn" title="朗读单词" aria-label="朗读单词">🔊</button>
+    </div>
+    <div class="tooltip-meaning" id="ttMeaning">正在查询翻译...</div>
+    <div class="tooltip-footer">
+      <span>Google 翻译实时释义</span>
+      <button class="tooltip-open-syntax" id="ttOpenSyntaxBtn">本句语法树 ➔</button>
+    </div>
+  </div>
+
+  <div class="syntax-backdrop" id="syntaxBackdrop"></div>
+  <section class="syntax-sheet" id="syntaxSheet" role="dialog" aria-modal="true">
+    <div class="sheet-drag-handle"></div>
+    <div class="sheet-top-bar">
+      <div>
+        <div class="sheet-sentence-en" id="sheetEn"></div>
+        <div class="sheet-sentence-zh" id="sheetZh"></div>
+      </div>
+      <button class="close-sheet-btn" id="closeSheetBtn">✕</button>
+    </div>
+
+    <div class="sheet-scroll-body">
+      
+      <!-- 控制栏与图例 -->
+      <div class="syntax-controls">
+        <div class="control-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleOmitted" checked />
+            <span>显示省略</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleAutoFit" checked />
+            <span>自适应屏幕</span>
+          </label>
+        </div>
+        <button class="btn-toggle-layout" id="toggleLayoutBtn">⇄ 切换纵向/横向</button>
+      </div>
+
+      <div class="legend-bar">
+        <div class="legend-item"><span class="legend-color noun"></span> 名/代/其他</div>
+        <div class="legend-item"><span class="legend-color verb"></span> 谓语动词</div>
+        <div class="legend-item"><span class="legend-color conj"></span> 连/助词</div>
+        <div class="legend-item"><span class="legend-color prep"></span> 介词/修饰</div>
+      </div>
+
+      <div class="diagram-viewport" id="diagramViewport">
+        <div class="diagram-canvas" id="diagramCanvas"></div>
+      </div>
+
+      <div class="section-tabs">
+        <div class="section-tab">核心语法 & 句型分析</div>
+      </div>
+      <div class="grammar-list" id="grammarList"></div>
+
+      <div class="section-tabs">
+        <div class="section-tab">词汇与短语详解</div>
+      </div>
+      <div class="vocab-grid" id="vocabGrid"></div>
+    </div>
+  </section>
+
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span>导入 AI 语法代码块</span>
+        <button class="close-sheet-btn" id="closeModalBtn">✕</button>
+      </div>
+      <p class="modal-desc">
+        请粘贴 AI 返回的 JSON（支持英/日文及注音）。<br>
+        <strong style="color:#fbbf24;">⚠️ 若文章较长，请确保复制的文本以 } 结尾，防止被系统截断。</strong>
+      </p>
+
+      <div class="import-actions">
+        <button class="btn btn-primary" id="pasteFromClipboardBtn">📋 一键粘贴</button>
+        <button class="btn" id="clearTextareaBtn">清空</button>
+      </div>
+
+      <div class="paste-status" id="pasteStatus"></div>
+
+      <textarea class="code-textarea" id="importTextarea" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="在此粘贴完整的 AI 输出 JSON..."></textarea>
+
+      <div class="modal-footer">
+        <button class="btn" id="resetDemoBtn">恢复示例</button>
+        <button class="btn btn-primary" id="confirmImportBtn">立即渲染</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="promptModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span>AI 提示词 v6.5</span>
+        <button class="close-sheet-btn" id="closePromptModalBtn">✕</button>
+      </div>
+      <div class="copy-tip" id="copyTipText">
+        ⏳ 正在尝试复制...
+      </div>
+      <div class="prompt-display" id="promptDisplay"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="retryCopyBtn">再次尝试复制</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-toast" id="statusToast" role="status" aria-live="polite"></div>
+
+  <script>
+    const DEFAULT_ARTICLE_DATA = {
+      title: "Scientific Rigor & Language Learning",
+      lang: "mix",
+      paragraphs: [
+        [
+          {
+            en: "Although she had analyzed the data carefully, she refused to publish until she was certain the results were accurate.",
+            zh: "尽管她仔细分析了数据，但在确定结果准确之前，她拒绝发表。",
+            tree: [
+              {
+                indent: 0,
+                clauseBox: "让步状语从句 (Adverbial Clause)",
+                nodes: [
+                  { text: "Although", role: "连接", arrow: "right", color: "conj" },
+                  { text: "she", role: "主语", arrow: "none", color: "noun" },
+                  { text: "had analyzed", role: "谓语", arrow: "none", color: "verb" },
+                  { text: "the data", role: "宾语", arrow: "left", color: "noun" },
+                  { text: "carefully", role: "状语", arrow: "left", color: "noun" }
+                ]
+              },
+              {
+                indent: 1,
+                clauseBox: "主句核心 (Main Clause)",
+                nodes: [
+                  { text: "she", role: "主语", arrow: "none", color: "noun" },
+                  { text: "refused", role: "谓语", arrow: "down", color: "verb" },
+                  { text: "to", role: "不定式", arrow: "right", color: "prep" },
+                  { text: "publish", role: "宾语", arrow: "left", color: "verb" }
+                ]
+              },
+              {
+                indent: 2,
+                clauseBox: "时间状语从句 + 嵌套宾语从句",
+                nodes: [
+                  { text: "until", role: "连接", arrow: "right", color: "conj" },
+                  { text: "she", role: "主语", arrow: "none", color: "noun" },
+                  { text: "was", role: "系动词", arrow: "none", color: "verb" },
+                  { text: "certain", role: "表语", arrow: "down", color: "noun" },
+                  { text: "(that)", role: "引导词", arrow: "right", color: "prep", omitted: true },
+                  { text: "the results", role: "主语", arrow: "none", color: "noun" },
+                  { text: "were", role: "系动词", arrow: "none", color: "verb" },
+                  { text: "accurate", role: "表语", arrow: "left", color: "noun" }
+                ]
+              }
+            ],
+            grammar: [
+              { pattern: "although + clause", desc: "让步状语从句", current: "Although she had analyzed..." },
+              { pattern: "refuse + to do", desc: "不定式作宾语", current: "refused to publish" }
+            ],
+            vocab: [
+              { word: "analyze", pos: "v. 分析", note: "搭配：analyze the data" }
+            ]
+          }
+        ]
+      ]
+    };
+
+    const STORAGE_KEY = "ai_syntax_reader_data_v6";
+    const VALID_COLORS = ["verb", "conj", "prep", "noun"];
+    const VALID_ARROWS = ["left", "right", "down", "none"];
+
+    let articleData = loadArticleData();
+    let currentSentenceObj = null;
+    let tapTimer = null;
+    let lastTappedEl = null;
+    
+    // 新增：全局布局状态 (horizontal | vertical)
+    let layoutMode = localStorage.getItem('tree_layout_mode') || 'horizontal'; 
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    const AI_PROMPT = `你是顶级多语言语法结构解析引擎。请将给定的英文或日文文章按段落和句子切分，严格只输出一个 JSON（不要任何多余的解释文字）。**必须使用 Markdown 的 \`\`\`json 代码块包裹**。请使用最紧凑的数组格式，**删除所有不必要的空格和换行**，以防长文本被系统剪贴板截断。
+
+顶层结构：{"title":"标题","lang":"en或ja","paragraphs":[[句子对象,...],...]}
+
+句子对象字段：
+- lang: "en" 或 "ja"
+- en: 英文原句（若为英文必填）
+- tokens: 仅日文需要。分词与注音数组：[{"s":"汉字词","r":"平假名"},{"s":"假名或标点"}]。英文可省略。
+- zh: 中文翻译
+- tree: 语法树行数组。每行格式 [缩进数字, "从句/成分名称", 节点数组]
+  节点格式：[词/短语, 角色, 箭头, 颜色] 或带省略 [词, 角色, 箭头, 颜色, 1]
+  箭头只用: "" | "l" | "r" | "d" （空=无, l=左, r=右, d=下）
+  颜色只用: verb | conj | prep | noun
+- g: 语法卡片数组，每项 [句型公式, 语法说明, 本句对应片段]
+- v: 词汇卡片数组，每项 [单词或短语, 词性与释义, 辨析或搭配]
+
+示例：
+\`\`\`json
+{"title":"例","lang":"ja","paragraphs":[[{"tokens":[{"s":"私","r":"わたし"},{"s":"は"},{"s":"学生","r":"がくせい"},{"s":"です"}],"zh":"我是学生","tree":[[0,"主句",[["私","主语","","noun"],["は","助词","r","conj"],["学生","表语","","noun"],["です","谓语","l","verb"]]]],"g":[["～は～です","判断句","私...です"]],"v":[["学生","n. 学生","がくせい"]]}]]}
+\`\`\`
+
+请解析以下文章：
+`;
+
+    function loadArticleData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return normalizeArticleData(JSON.parse(saved));
+      } catch (e) {}
+      return DEFAULT_ARTICLE_DATA;
+    }
+
+    function saveArticleData(data) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+    }
+
+    const ARROW_MAP = { l: "left", r: "right", d: "down", "": "none", left: "left", right: "right", down: "down", none: "none" };
+    function normalizeColor(c) { return VALID_COLORS.includes(c) ? c : "noun"; }
+
+    function normalizeNode(node) {
+      if (node && typeof node === "object" && !Array.isArray(node)) {
+        return { text: node.text || "", role: node.role || "", arrow: ARROW_MAP[node.arrow] || "none", color: normalizeColor(node.color), omitted: !!node.omitted };
+      }
+      if (Array.isArray(node) && node.length >= 2) {
+        return { text: node[0] || "", role: node[1] || "", arrow: ARROW_MAP[node[2]] || "none", color: normalizeColor(node[3]), omitted: node[4] === 1 || node[4] === true };
+      }
+      return { text: String(node || ""), role: "", arrow: "none", color: "noun", omitted: false };
+    }
+
+    function normalizeTreeRow(row) {
+      if (row && typeof row === "object" && !Array.isArray(row)) {
+        return { indent: row.indent || 0, clauseBox: row.clauseBox || "", nodes: (row.nodes || []).map(normalizeNode) };
+      }
+      if (Array.isArray(row)) {
+        return { indent: row[0] || 0, clauseBox: row[1] || "", nodes: (row[2] || []).map(normalizeNode) };
+      }
+      return { indent: 0, clauseBox: "", nodes: [] };
+    }
+
+    function normalizeSentence(sent) {
+      if (!sent || typeof sent !== "object") return null;
+      if (!sent.en && !sent.tokens && !sent.ja) return null;
+      
+      let tokens = [];
+      if (Array.isArray(sent.tokens)) {
+        tokens = sent.tokens.map(t => {
+          if (Array.isArray(t)) return { s: t[0], r: t[1] || "" };
+          return { s: t.s || "", r: t.r || "" };
+        });
+      }
+
+      return {
+        en: sent.en || "",
+        ja: sent.ja || "",
+        tokens: tokens,
+        zh: sent.zh || "",
+        tree: (sent.tree || []).map(normalizeTreeRow),
+        grammar: (sent.grammar || sent.g || []).map(item => {
+          if (Array.isArray(item)) return { pattern: item[0], desc: item[1], current: item[2] };
+          return item;
+        }),
+        vocab: (sent.vocab || sent.v || []).map(item => {
+          if (Array.isArray(item)) return { word: item[0], pos: item[1], note: item[2] };
+          return item;
+        })
+      };
+    }
+
+    function normalizeParagraph(para) {
+      if (Array.isArray(para)) return para.map(normalizeSentence).filter(Boolean);
+      if (para && typeof para === "object") return [normalizeSentence(para)].filter(Boolean);
+      return [];
+    }
+
+    function normalizeArticleData(data) {
+      if (!data || typeof data !== "object") return DEFAULT_ARTICLE_DATA;
+      const paras = Array.isArray(data.paragraphs) ? data.paragraphs : [];
+      return {
+        title: data.title || "Reading Passage",
+        lang: data.lang || "auto",
+        paragraphs: paras.map(normalizeParagraph)
+      };
+    }
+
+    function renderArticle() {
+      const titleEl = document.getElementById("articleTitle");
+      const contentEl = document.getElementById("articleContent");
+      titleEl.textContent = articleData.title || "Reading Passage";
+      contentEl.innerHTML = "";
+
+      (articleData.paragraphs || []).forEach((para, pIdx) => {
+        if (!para || para.length === 0) return;
+        const pEl = document.createElement("p");
+        pEl.className = "paragraph";
+
+        para.forEach((sentObj, sIdx) => {
+          const sentSpan = document.createElement("span");
+          sentSpan.className = "sentence-wrap";
+          sentSpan.dataset.pIdx = pIdx;
+          sentSpan.dataset.sIdx = sIdx;
+
+          if (sentObj.tokens && sentObj.tokens.length > 0) {
+            sentObj.tokens.forEach((token, tIdx) => {
+              const wordSpan = document.createElement("span");
+              wordSpan.className = "word-token";
+              
+              if (token.r) {
+                wordSpan.innerHTML = `<ruby>${esc(token.s)}<rt>${esc(token.r)}</rt></ruby>`;
+              } else {
+                wordSpan.textContent = token.s;
+              }
+              wordSpan.dataset.cleanWord = token.s;
+              
+              sentSpan.appendChild(wordSpan);
+              const isEnglish = sentObj.en && !sentObj.tokens;
+              if (tIdx < sentObj.tokens.length - 1 && isEnglish) {
+                 sentSpan.appendChild(document.createTextNode(" "));
+              }
+            });
+          } else {
+            const text = sentObj.en || "";
+            const rawTokens = text.split(/\s+/);
+            rawTokens.forEach((rawToken, tIdx) => {
+              const wordSpan = document.createElement("span");
+              wordSpan.className = "word-token";
+              wordSpan.textContent = rawToken;
+              const cleanWord = rawToken.replace(/^[^a-zA-Z0-9'-]+|[^a-zA-Z0-9'-]+$/g, "");
+              wordSpan.dataset.cleanWord = cleanWord || rawToken;
+              
+              sentSpan.appendChild(wordSpan);
+              if (tIdx < rawTokens.length - 1) {
+                sentSpan.appendChild(document.createTextNode(" "));
+              }
+            });
+          }
+
+          pEl.appendChild(sentSpan);
+          pEl.appendChild(document.createTextNode(" "));
+        });
+
+        contentEl.appendChild(pEl);
+      });
+    }
+
+    document.getElementById("articleContent").addEventListener("click", (e) => {
+      const targetEl = e.target.tagName.toLowerCase() === 'rt' ? e.target.closest('.word-token') : e.target.closest(".word-token");
+      const wordEl = targetEl;
+      if (!wordEl) return;
+      
+      const sentEl = wordEl.closest(".sentence-wrap");
+      if (!sentEl) return;
+      
+      const pIdx = parseInt(sentEl.dataset.pIdx, 10);
+      const sIdx = parseInt(sentEl.dataset.sIdx, 10);
+      const sentObj = articleData.paragraphs?.[pIdx]?.[sIdx];
+      if (!sentObj) return;
+      e.stopPropagation();
+      handleWordTap(wordEl, sentEl, sentObj);
+    });
+
+    function handleWordTap(wordEl, sentEl, sentObj) {
+      if (tapTimer && lastTappedEl === wordEl) {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+        lastTappedEl = null;
+        hideWordTooltip();
+        highlightSentence(sentEl);
+        openSyntaxSheet(sentObj, wordEl.dataset.cleanWord);
+      } else {
+        if (tapTimer) clearTimeout(tapTimer);
+        lastTappedEl = wordEl;
+        tapTimer = setTimeout(() => {
+          tapTimer = null;
+          lastTappedEl = null;
+          highlightWord(wordEl, sentEl);
+          showWordTooltip(wordEl, sentObj);
+        }, 280);
+      }
+    }
+
+    function highlightWord(wordEl, sentEl) {
+      document.querySelectorAll(".word-token.active-word").forEach(el => el.classList.remove("active-word"));
+      document.querySelectorAll(".sentence-wrap.active-sentence").forEach(el => el.classList.remove("active-sentence"));
+      wordEl.classList.add("active-word");
+      sentEl.classList.add("active-sentence");
+    }
+
+    function highlightSentence(sentEl) {
+      document.querySelectorAll(".word-token.active-word").forEach(el => el.classList.remove("active-word"));
+      document.querySelectorAll(".sentence-wrap.active-sentence").forEach(el => el.classList.remove("active-sentence"));
+      sentEl.classList.add("active-sentence");
+    }
+
+    // 单词悬浮翻译
+    const transCache = new Map();
+    let tooltipReqId = 0;
+
+    function withTimeout(promise, ms) {
+      return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+    }
+
+    async function fetchTranslation(word) {
+      const key = word.toLowerCase();
+      if (transCache.has(key)) return transCache.get(key);
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&dt=bd&q=${encodeURIComponent(word)}`;
+      const p = fetch(url).then(r => r.json());
+      const data = await withTimeout(p, 6000);
+      transCache.set(key, data);
+      return data;
+    }
+
+    async function showWordTooltip(wordEl, sentObj) {
+      const tooltip = document.getElementById("wordTooltip");
+      const ttWord = document.getElementById("ttWord");
+      const ttMeaning = document.getElementById("ttMeaning");
+      const word = wordEl.dataset.cleanWord;
+
+      const reqId = ++tooltipReqId;
+      currentSentenceObj = sentObj;
+      ttWord.textContent = word;
+      ttMeaning.textContent = "正在查询翻译...";
+
+      tooltip.style.display = "block";
+      tooltip.style.visibility = "hidden";
+
+      const rect = wordEl.getBoundingClientRect();
+      const ttW = tooltip.offsetWidth || 280;
+      const ttH = tooltip.offsetHeight || 130;
+
+      let left = rect.left + rect.width / 2 - ttW / 2;
+      left = Math.max(10, Math.min(left, window.innerWidth - ttW - 10));
+      let top = rect.bottom + 10;
+      if (top + ttH + 10 > window.innerHeight) {
+        top = Math.max(10, rect.top - ttH - 10);
+      }
+
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.visibility = "";
+
+      let localMatch = null;
+      if (sentObj.vocab) {
+        localMatch = sentObj.vocab.find(v => v.word && v.word.includes(word));
+      }
+
+      try {
+        const data = await fetchTranslation(word);
+        if (reqId !== tooltipReqId) return;
+
+        const mainTrans = data?.[0]?.[0]?.[0] || "";
+        let dictLines = [];
+        if (Array.isArray(data?.[1])) {
+          data[1].slice(0, 2).forEach(posBlock => {
+            const pos = posBlock[0];
+            const terms = (posBlock[1] || []).slice(0, 4).join("；");
+            if (pos && terms) dictLines.push(`${esc(pos)}. ${esc(terms)}`);
+          });
+        }
+
+        if (dictLines.length > 0) {
+          ttMeaning.innerHTML = dictLines.join("<br>");
+        } else if (mainTrans) {
+          ttMeaning.textContent = mainTrans;
+        } else if (localMatch) {
+          ttMeaning.textContent = localMatch.pos;
+        } else {
+          ttMeaning.textContent = "未查询到释义";
+        }
+      } catch (err) {
+        if (reqId !== tooltipReqId) return;
+        ttMeaning.textContent = localMatch ? localMatch.pos : "网络受限，请双击展开解析";
+      }
+    }
+
+    function hideWordTooltip() { document.getElementById("wordTooltip").style.display = "none"; }
+
+    document.getElementById("ttSpeakBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const word = document.getElementById("ttWord").textContent;
+      if ("speechSynthesis" in window && word) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(word);
+        const hasKana = /[\u3040-\u309f\u30a0-\u30ff]/.test(word);
+        utter.lang = hasKana || articleData.lang === 'ja' ? "ja-JP" : "en-US";
+        utter.rate = 0.95;
+        window.speechSynthesis.speak(utter);
+      }
+    });
+
+    document.getElementById("ttOpenSyntaxBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const word = document.getElementById("ttWord").textContent;
+      hideWordTooltip();
+      if (currentSentenceObj) openSyntaxSheet(currentSentenceObj, word);
+    });
+
+    window.addEventListener("scroll", hideWordTooltip, { passive: true });
+    document.addEventListener("click", (e) => {
+      if (!document.getElementById("wordTooltip").contains(e.target)) hideWordTooltip();
+    });
+
+    // ========== 语法树面板 ==========
+    let savedScrollY = 0;
+    function lockBodyScroll() {
+      savedScrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${savedScrollY}px`;
+      document.body.style.width = "100%";
+    }
+    function unlockBodyScroll() {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, savedScrollY);
+    }
+
+    function showBackdrop(show) {
+      const bd = document.getElementById("syntaxBackdrop");
+      if (show) {
+        bd.style.display = "block";
+        requestAnimationFrame(() => bd.classList.add("show"));
+      } else {
+        bd.classList.remove("show");
+        setTimeout(() => { if (!bd.classList.contains("show")) bd.style.display = "none"; }, 260);
+      }
+    }
+
+    function adjustTreeScale() {
+      const isFit = document.getElementById("toggleAutoFit").checked;
+      const viewport = document.getElementById("diagramViewport");
+      const canvas = document.getElementById("diagramCanvas");
+      if (!viewport || !canvas) return;
+
+      if (!isFit) {
+        canvas.style.transform = "";
+        canvas.style.width = "max-content";
+        canvas.style.height = "";
+        viewport.style.overflowX = "auto";
+        return;
+      }
+
+      canvas.style.transform = "";
+      canvas.style.width = "max-content";
+      canvas.style.height = "auto";
+      viewport.style.overflowX = "hidden";
+
+      const vpWidth = viewport.clientWidth - 24; // 减去左右 padding
+      const cvWidth = canvas.scrollWidth;
+      const cvHeight = canvas.scrollHeight;
+
+      if (cvWidth > vpWidth) {
+        const scale = vpWidth / cvWidth;
+        const finalScale = Math.max(scale, 0.55);
+        canvas.style.transform = `scale(${finalScale})`;
+        canvas.style.transformOrigin = "top left";
+        canvas.style.width = `${cvWidth}px`;
+        canvas.style.height = `${cvHeight * finalScale}px`;
+      }
+    }
+
+    // 切换布局模式
+    document.getElementById("toggleLayoutBtn").addEventListener("click", () => {
+      layoutMode = layoutMode === "horizontal" ? "vertical" : "horizontal";
+      localStorage.setItem('tree_layout_mode', layoutMode);
+      
+      const btn = document.getElementById("toggleLayoutBtn");
+      btn.textContent = layoutMode === "horizontal" ? "⇄ 切至纵向" : "⇅ 切至横向";
+      
+      if (currentSentenceObj) {
+        renderSyntaxTree(currentSentenceObj.tree || [], document.getElementById("toggleOmitted").checked, "");
+        setTimeout(adjustTreeScale, 50);
+      }
+    });
+
+    function openSyntaxSheet(sentObj, focusWord = "") {
+      currentSentenceObj = sentObj;
+      
+      let displayText = sentObj.en || sentObj.ja || "";
+      if (sentObj.tokens && sentObj.tokens.length > 0) {
+        displayText = sentObj.tokens.map(t => t.s).join("");
+      }
+      
+      document.getElementById("sheetEn").textContent = displayText;
+      document.getElementById("sheetZh").textContent = sentObj.zh || "";
+
+      const showOmitted = document.getElementById("toggleOmitted").checked;
+      renderSyntaxTree(sentObj.tree || [], showOmitted, focusWord);
+      renderGrammarCards(sentObj.grammar || []);
+      renderVocabCards(sentObj.vocab || [], focusWord);
+
+      const scrollBody = document.querySelector(".sheet-scroll-body");
+      if (scrollBody) scrollBody.scrollTop = 0;
+
+      // 更新排版按钮状态
+      const btn = document.getElementById("toggleLayoutBtn");
+      btn.textContent = layoutMode === "horizontal" ? "⇄ 切至纵向" : "⇅ 切至横向";
+
+      lockBodyScroll();
+      showBackdrop(true);
+      document.getElementById("syntaxSheet").classList.add("open");
+      setTimeout(adjustTreeScale, 50);
+    }
+
+    function closeSyntaxSheet() {
+      const sheet = document.getElementById("syntaxSheet");
+      if (!sheet.classList.contains("open")) return;
+      showBackdrop(false);
+      sheet.classList.remove("open");
+      unlockBodyScroll();
+    }
+
+    function renderSyntaxTree(treeRows, showOmitted, focusWord = "") {
+      const canvas = document.getElementById("diagramCanvas");
+      canvas.innerHTML = "";
+      const fw = (focusWord || "").toLowerCase();
+
+      treeRows.forEach((row, rIdx) => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "tree-row";
+        
+        // 绘制缩进折线
+        const indentPx = (row.indent || 0) * 24; // 每级缩进24px
+        const indentWrap = document.createElement("div");
+        indentWrap.className = "tree-indent";
+        indentWrap.style.width = `${indentPx}px`;
+        
+        // 填补之前的层级背景（通过伪元素画线）
+        if (row.indent > 0) {
+            const guide = document.createElement("div");
+            guide.className = "indent-guide";
+            indentWrap.appendChild(guide);
+        }
+        rowEl.appendChild(indentWrap);
+
+        // 构建语法大框
+        const boxEl = document.createElement("div");
+        boxEl.className = "clause-box";
+
+        if (row.clauseBox) {
+          const titleBadge = document.createElement("span");
+          titleBadge.className = "clause-box-title";
+          titleBadge.textContent = row.clauseBox;
+          boxEl.appendChild(titleBadge);
+        }
+
+        // 节点容器（依据布局状态挂载 class）
+        const nodesFlow = document.createElement("div");
+        nodesFlow.className = "nodes-flow" + (layoutMode === "vertical" ? " layout-vertical" : "");
+
+        (row.nodes || []).forEach(node => {
+          const nodeWrap = document.createElement("div");
+          nodeWrap.className = "syntax-node";
+          if (node.omitted) {
+            nodeWrap.classList.add("omitted-node");
+            if (!showOmitted) nodeWrap.classList.add("hidden-omitted");
+          }
+          if (fw && node.text && node.text.toLowerCase().includes(fw)) {
+            nodeWrap.classList.add("focus-node");
+          }
+
+          const badge = document.createElement("div");
+          badge.className = "role-badge";
+          if (["主语", "谓语", "系动词"].includes(node.role)) badge.classList.add("role-core");
+          else if (["连接", "引导词", "时间连接", "助词"].includes(node.role)) badge.classList.add("role-Access");
+
+          const roleSpan = document.createElement("span");
+          roleSpan.textContent = node.role || "";
+          badge.appendChild(roleSpan);
+
+          const wordBox = document.createElement("div");
+          const colorClass = `color-${VALID_COLORS.includes(node.color) ? node.color : "noun"}`;
+          wordBox.className = `word-box ${colorClass}`;
+          wordBox.textContent = node.text;
+
+          // 箭头处理
+          const arrowSpan = document.createElement("span");
+          arrowSpan.className = "arrow-icon";
+          if (node.arrow === "left") arrowSpan.textContent = "←"; 
+          else if (node.arrow === "right") arrowSpan.textContent = "→";
+          else if (node.arrow === "down") arrowSpan.textContent = "↓";
+          else arrowSpan.style.display = "none";
+
+          nodeWrap.addEventListener("click", () => {
+            highlightVocabByText(node.text);
+            if ("speechSynthesis" in window) {
+              window.speechSynthesis.cancel();
+              const clean = node.text.replace(/[()]/g, "");
+              const u = new SpeechSynthesisUtterance(clean);
+              const hasKana = /[\u3040-\u309f\u30a0-\u30ff]/.test(clean);
+              u.lang = hasKana || articleData.lang === 'ja' ? "ja-JP" : "en-US";
+              window.speechSynthesis.speak(u);
+            }
+          });
+
+          // 水平模式下，标签在词上方；垂直模式下，利用 CSS 调整顺序，但 DOM 结构保持一致
+          nodeWrap.appendChild(badge);
+          nodeWrap.appendChild(wordBox);
+          if (node.arrow !== "none") nodeWrap.appendChild(arrowSpan);
+
+          nodesFlow.appendChild(nodeWrap);
+        });
+
+        boxEl.appendChild(nodesFlow);
+        rowEl.appendChild(boxEl);
+        canvas.appendChild(rowEl);
+      });
+    }
+
+    document.getElementById("toggleOmitted").addEventListener("change", (e) => {
+      document.querySelectorAll(".syntax-node.omitted-node").forEach(el => {
+        el.classList.toggle("hidden-omitted", !e.target.checked);
+      });
+      adjustTreeScale();
+    });
+    document.getElementById("toggleAutoFit").addEventListener("change", adjustTreeScale);
+    window.addEventListener("resize", () => {
+      if (document.getElementById("syntaxSheet").classList.contains("open")) adjustTreeScale();
+    });
+
+    function renderGrammarCards(grammarArr) {
+      const listEl = document.getElementById("grammarList");
+      listEl.innerHTML = "";
+      grammarArr.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "grammar-card";
+        card.innerHTML = `
+          <div class="grammar-pattern"><span>${esc(item.pattern)}</span><span style="color:#6b7280;">›</span></div>
+          <div class="grammar-desc">${esc(item.desc)}</div>
+          ${item.current ? `<div class="grammar-instance">◎ ${esc(item.current)}</div>` : ""}
+        `;
+        listEl.appendChild(card);
+      });
+    }
+
+    function renderVocabCards(vocabArr, focusWord = "") {
+      const gridEl = document.getElementById("vocabGrid");
+      gridEl.innerHTML = "";
+      const cleanFocus = (focusWord || "").toLowerCase();
+
+      vocabArr.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "vocab-card";
+        card.dataset.vocabWord = (item.word || "").toLowerCase();
+        if (cleanFocus && card.dataset.vocabWord.includes(cleanFocus)) card.classList.add("highlight-card");
+
+        card.innerHTML = `
+          <div>
+            <div class="vocab-word"><span>${esc(item.word)}</span><span style="color:#6b7280;">›</span></div>
+            <div class="vocab-pos">${esc(item.pos)}</div>
+          </div>
+          ${item.note ? `<div class="vocab-note">辨析/搭配：♣ ${esc(item.note)}</div>` : ""}
+        `;
+        gridEl.appendChild(card);
+      });
+    }
+
+    function highlightVocabByText(nodeText) {
+      const isCJK = /[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]/.test(nodeText);
+      const tokens = isCJK ? [nodeText] : nodeText.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(Boolean);
+      
+      const cards = document.querySelectorAll(".vocab-card");
+      let firstMatched = null;
+
+      cards.forEach(card => {
+        card.classList.remove("highlight-card");
+        const target = card.dataset.vocabWord || "";
+        if (tokens.some(t => t.length > 1 && target.includes(t))) {
+          card.classList.add("highlight-card");
+          if (!firstMatched) firstMatched = card;
+        }
+      });
+      if (firstMatched) firstMatched.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    document.getElementById("closeSheetBtn").addEventListener("click", closeSyntaxSheet);
+    document.getElementById("syntaxBackdrop").addEventListener("click", closeSyntaxSheet);
+
+    // 导入与粘贴
+    const importModal = document.getElementById("importModal");
+    const importTextarea = document.getElementById("importTextarea");
+    const pasteStatus = document.getElementById("pasteStatus");
+
+    function setPasteStatus(text, type = "info") {
+      if (!text) { pasteStatus.classList.remove("show", "ok", "warn", "info"); pasteStatus.textContent = ""; return; }
+      pasteStatus.className = `paste-status show ${type}`;
+      pasteStatus.textContent = text;
+    }
+
+    function precleanPastedText(raw) {
+      let t = String(raw || "").trim();
+      t = t.replace(/^```(?:json|JSON)?\s*/i, "").replace(/\s*```\s*$/i, "");
+      const fb = t.indexOf("{"), lb = t.lastIndexOf("}");
+      if (fb !== -1 && lb > fb) t = t.slice(fb, lb + 1);
+      return t;
+    }
+
+    function analyzePastedText(text) {
+      const len = text.length;
+      if (!len) { setPasteStatus(""); return; }
+      
+      const trimmed = text.trim();
+      const startsOk = trimmed.startsWith("{") || trimmed.includes("```json");
+      const endsOk = trimmed.endsWith("}") || trimmed.endsWith("```");
+
+      if (startsOk && !endsOk) {
+        setPasteStatus(`⚠️ 警告：捕获了 ${len.toLocaleString()} 字符，但结尾不完整，极有可能被系统截断了！请尝试缩短文章后重新生成。`, "warn");
+        return;
+      }
+
+      const enCount = (text.match(/"en"\s*:/g) || []).length;
+      const tokCount = (text.match(/"tokens"\s*:/g) || []).length;
+
+      if (startsOk && endsOk && (enCount > 0 || tokCount > 0)) {
+        setPasteStatus(`✅ 已捕获 ${len.toLocaleString()} 字符，检测到 ${enCount + tokCount} 个结构。点击「立即渲染」开始。`, "ok");
+      } else {
+        setPasteStatus(`已捕获 ${len.toLocaleString()} 字符，点击渲染尝试解析。`, "info");
+      }
+    }
+
+    function handlePastedText(raw) {
+      if (!raw || !String(raw).trim()) return false;
+      const cleaned = precleanPastedText(raw);
+      importTextarea.value = cleaned;
+      analyzePastedText(cleaned);
+      showToast("已完整捕获粘贴内容", "success");
+      return true;
+    }
+
+    importTextarea.addEventListener("paste", (e) => {
+      const cd = e.clipboardData || window.clipboardData;
+      if (!cd) return;
+      const text = cd.getData("text");
+      if (!text) return;
+      e.preventDefault();
+      handlePastedText(text);
+    });
+
+    document.addEventListener("paste", (e) => {
+      if (!importModal.classList.contains("show") || e.target === importTextarea) return;
+      const cd = e.clipboardData || window.clipboardData;
+      const text = cd && cd.getData("text");
+      if (!text) return;
+      e.preventDefault();
+      handlePastedText(text);
+    });
+
+    document.getElementById("openImportBtn").addEventListener("click", () => {
+      importModal.classList.add("show");
+      setTimeout(() => importTextarea.focus(), 180);
+    });
+
+    document.getElementById("closeModalBtn").addEventListener("click", () => importModal.classList.remove("show"));
+
+    document.getElementById("pasteFromClipboardBtn").addEventListener("click", async () => {
+      setPasteStatus("正在尝试读取剪贴板...", "info");
+      importTextarea.focus();
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.readText === "function") {
+          const text = await withTimeout(navigator.clipboard.readText(), 1500);
+          if (text && text.trim()) {
+            handlePastedText(text);
+            return;
+          }
+        }
+      } catch (err) {}
+      setPasteStatus("💡 安卓系统限制了网页自动读取。键盘已弹出，请在输入框内「长按 → 粘贴」。", "info");
+    });
+
+    document.getElementById("clearTextareaBtn").addEventListener("click", () => {
+      importTextarea.value = "";
+      setPasteStatus("");
+      importTextarea.focus();
+    });
+
+    importTextarea.addEventListener("input", () => analyzePastedText(importTextarea.value));
+
+    function cleanAndParseJSON(raw) {
+      if (!raw || !raw.trim()) throw new Error("内容为空");
+      let text = raw.trim();
+      text = text.replace(/^```(?:json|JSON)?\s*/i, "").replace(/\s*```\s*$/i, "");
+      const firstBrace = text.indexOf("{"), lastBrace = text.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) text = text.slice(firstBrace, lastBrace + 1);
+      
+      text = text.replace(/\\\[/g, "[").replace(/\\\]/g, "]").replace(/\\\{/g, "{").replace(/\\\}/g, "}");
+      if ((text.match(/\\"/g) || []).length > 20 && text.includes('\\"en\\"')) {
+        text = text.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        throw new Error("JSON 格式有误，极有可能是内容过长导致截断，请检查结尾是否完整。");
+      }
+
+      if (!parsed.paragraphs || !Array.isArray(parsed.paragraphs)) throw new Error("缺少 paragraphs 数组。");
+      return normalizeArticleData(parsed);
+    }
+
+    document.getElementById("confirmImportBtn").addEventListener("click", () => {
+      const raw = importTextarea.value;
+      try {
+        const parsed = cleanAndParseJSON(raw);
+        articleData = parsed;
+        saveArticleData(articleData);
+        renderArticle();
+        importModal.classList.remove("show");
+        setPasteStatus("");
+        importTextarea.value = "";
+        showToast("导入成功！", "success");
+      } catch (err) {
+        showToast("导入失败：" + err.message, "error");
+      }
+    });
+
+    document.getElementById("resetDemoBtn").addEventListener("click", () => {
+      articleData = DEFAULT_ARTICLE_DATA;
+      saveArticleData(articleData);
+      renderArticle();
+      importModal.classList.remove("show");
+      setPasteStatus("");
+      importTextarea.value = "";
+      showToast("已恢复双语示例", "success");
+    });
+
+    // 复制提示词
+    async function copyTextRobust(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { }
+      }
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+
+    document.getElementById("copyPromptBtn").addEventListener("click", async () => {
+      const promptModal = document.getElementById("promptModal");
+      const display = document.getElementById("promptDisplay");
+      const tip = document.getElementById("copyTipText");
+
+      display.textContent = AI_PROMPT;
+      promptModal.classList.add("show");
+      tip.innerHTML = "⏳ 正在尝试自动复制...";
+      
+      try {
+        const success = await copyTextRobust(AI_PROMPT);
+        if (success) {
+          tip.innerHTML = "✅ 已自动复制到剪贴板。可直接去 AI 对话中粘贴。";
+          showToast("提示词已复制", "success");
+        } else {
+          tip.innerHTML = "⚠️ 浏览器阻止了自动复制。请<strong>长按上方文字</strong> → 全选 → 复制。";
+        }
+      } catch (e) {
+        tip.innerHTML = "⚠️ 浏览器阻止了自动复制。请<strong>长按上方文字</strong> → 全选 → 复制。";
+      }
+    });
+
+    document.getElementById("closePromptModalBtn").addEventListener("click", () => {
+      document.getElementById("promptModal").classList.remove("show");
+    });
+
+    document.getElementById("retryCopyBtn").addEventListener("click", async () => {
+      const success = await copyTextRobust(AI_PROMPT);
+      if (success) {
+        showToast("已复制", "success");
+        document.getElementById("copyTipText").innerHTML = "✅ 已自动复制到剪贴板。";
+      } else {
+        showToast("复制失败，请长按文字选中", "error");
+        document.getElementById("copyTipText").innerHTML = "⚠️ 请<strong>长按上方文字</strong>选中复制。";
+      }
+    });
+
+    importModal.addEventListener("click", (e) => { if (e.target === importModal) importModal.classList.remove("show"); });
+    document.getElementById("promptModal").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove("show"); });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeSyntaxSheet();
+        importModal.classList.remove("show");
+        document.getElementById("promptModal").classList.remove("show");
+        hideWordTooltip();
+      }
+    });
+
+    renderArticle();
+  </script>
+</body>
+</html>
